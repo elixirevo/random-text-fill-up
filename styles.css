@@ -66,6 +66,7 @@ textarea#sourceText {
 
 .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .row.buttons { gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.row select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--fg); }
 
 input[type="range"] { width: 220px; }
 output#maskRatioValue { color: var(--muted); min-width: 44px; display: inline-block; }
@@ -129,4 +130,27 @@ button.secondary { background: transparent; }
 }
 
 .legend { margin-top: 8px; color: var(--muted); font-size: 14px; }
+
+.word-input {
+  display: inline-block;
+  min-width: 6ch;
+  height: 2.2em;
+  padding: 0 8px;
+  margin: 0 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 18px;
+}
+
+.word-input.correct {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+.word-input.incorrect {
+  color: var(--danger-strong);
+  border-color: var(--danger);
+}
 

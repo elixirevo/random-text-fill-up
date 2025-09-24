@@ -62,11 +62,12 @@ npx http-server -p 5173
 
 1. Enter your text in the “Source Text” area.
 2. Adjust the “Mask Ratio” slider.
-3. Click “Generate” to create blanks.
-4. Type into blanks to get instant feedback.
+3. Choose the “Mask Unit”: `Character` or `Word`.
+4. Click “Generate” to create blanks.
+5. Type into blanks to get instant feedback.
    - Blue = correct, Red = incorrect
-5. Click “Reveal All” to fill all answers at once.
-6. Click “Reset” to start over.
+6. Click “Reveal All” to fill all answers at once.
+7. Click “Reset” to start over.
 
 ### Shortcuts & Input Tips
 

@@ -10,6 +10,7 @@ const els = {
   sourceText: document.getElementById('sourceText'),
   maskRatio: document.getElementById('maskRatio'),
   maskRatioValue: document.getElementById('maskRatioValue'),
+  maskMode: document.getElementById('maskMode'),
   btnGenerate: document.getElementById('btnGenerate'),
   btnRevealAll: document.getElementById('btnRevealAll'),
   btnReset: document.getElementById('btnReset'),
@@ -45,7 +46,7 @@ function isMaskableChar(ch) {
   return /[A-Za-z0-9\uAC00-\uD7A3]/.test(ch)
 }
 
-function buildMask(originalText, ratioPercent) {
+function buildMaskChar(originalText, ratioPercent) {
   const codepoints = Array.from(originalText)
   const maskableIndexes = []
   for (let i = 0; i < codepoints.length; i += 1) {
@@ -72,12 +73,56 @@ function buildMask(originalText, ratioPercent) {
   return { codepoints, maskMap }
 }
 
+function tokenizeWords(text) {
+  const tokens = []
+  let current = ''
+  let isWord = null
+  const arr = Array.from(text)
+  const isWordChar = supportsUnicodeProps
+    ? (ch) => /\p{L}|\p{N}/u.test(ch)
+    : (ch) => /[A-Za-z0-9\uAC00-\uD7A3]/.test(ch)
+
+  for (let i = 0; i < arr.length; i += 1) {
+    const ch = arr[i]
+    const w = isWordChar(ch)
+    if (isWord === null) {
+      isWord = w
+      current = ch
+      continue
+    }
+    if (w === isWord) {
+      current += ch
+    } else {
+      tokens.push({ text: current, isWord })
+      isWord = w
+      current = ch
+    }
+  }
+  if (current) tokens.push({ text: current, isWord: !!isWord })
+  return tokens
+}
+
+function buildMaskWord(originalText, ratioPercent) {
+  const tokens = tokenizeWords(originalText)
+  const ratio = Math.max(0, Math.min(100, Number(ratioPercent))) / 100
+  const rng = Math.random
+  const maskMap = tokens.map((t) => (t.isWord ? rng() < ratio : false))
+  // Ensure at least one masked word if possible
+  const maskableIndexes = tokens.map((t, i) => (t.isWord ? i : -1)).filter((i) => i >= 0)
+  const maskedCount = maskMap.filter(Boolean).length
+  if (maskedCount === 0 && maskableIndexes.length > 0 && ratio > 0) {
+    const pick = maskableIndexes[Math.floor(rng() * maskableIndexes.length)]
+    maskMap[pick] = true
+  }
+  return { tokens, maskMap }
+}
+
 function clearNodeChildren(node) {
   while (node.firstChild) node.removeChild(node.firstChild)
 }
 
 function updateStats() {
-  const inputs = els.renderArea.querySelectorAll('input.mask-input')
+  const inputs = els.renderArea.querySelectorAll('input.mask-input, input.word-input')
   const total = inputs.length
   let correct = 0
   inputs.forEach((inp) => {
@@ -87,7 +132,7 @@ function updateStats() {
 }
 
 function focusNextMasked(fromIndex) {
-  const inputs = els.renderArea.querySelectorAll('input.mask-input')
+  const inputs = els.renderArea.querySelectorAll('input.mask-input, input.word-input')
   for (let i = 0; i < inputs.length; i += 1) {
     const idx = Number(inputs[i].dataset.idx)
     if (idx > fromIndex) {
@@ -98,7 +143,7 @@ function focusNextMasked(fromIndex) {
 }
 
 function focusPrevMasked(fromIndex) {
-  const inputs = els.renderArea.querySelectorAll('input.mask-input')
+  const inputs = els.renderArea.querySelectorAll('input.mask-input, input.word-input')
   for (let i = inputs.length - 1; i >= 0; i -= 1) {
     const idx = Number(inputs[i].dataset.idx)
     if (idx < fromIndex) {
@@ -121,7 +166,7 @@ function compareChar(inputChar, answerChar) {
   return inputChar.toLocaleLowerCase() === answerChar.toLocaleLowerCase()
 }
 
-function renderBoard(codepoints, maskMap) {
+function renderBoardChar(codepoints, maskMap) {
   clearNodeChildren(els.renderArea)
   const frag = document.createDocumentFragment()
 
@@ -219,20 +264,104 @@ function renderBoard(codepoints, maskMap) {
   updateStats()
 }
 
+function renderBoardWord(tokens, maskMap) {
+  clearNodeChildren(els.renderArea)
+  const frag = document.createDocumentFragment()
+  let caretIndex = -1
+
+  const createWordInput = (answer, idx) => {
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.autocomplete = 'off'
+    input.autocapitalize = 'none'
+    input.spellcheck = false
+    input.className = 'word-input token'
+    input.placeholder = '____'
+    input.dataset.answer = answer
+    input.dataset.idx = String(idx)
+
+    input.addEventListener('input', (e) => {
+      const val = (e.target.value || '').trim()
+      const ok = val.localeCompare(answer, undefined, { sensitivity: 'accent' }) === 0
+      e.target.classList.toggle('correct', ok)
+      e.target.classList.toggle('incorrect', !ok && val.length > 0)
+      if (ok) {
+        e.target.value = answer
+        focusNextMasked(Number(e.target.dataset.idx))
+      }
+      updateStats()
+    })
+
+    input.addEventListener('keydown', (e) => {
+      const idx = Number(e.currentTarget.dataset.idx)
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        focusNextMasked(idx)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        focusPrevMasked(idx)
+      } else if (e.key === 'Backspace' && e.currentTarget.value) {
+        e.currentTarget.classList.remove('correct', 'incorrect')
+      }
+    })
+
+    return input
+  }
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = tokens[i]
+    if (maskMap[i]) {
+      const input = createWordInput(t.text, i)
+      if (caretIndex === -1) caretIndex = i
+      frag.appendChild(input)
+    } else {
+      if (t.text === '\n') {
+        frag.appendChild(document.createElement('br'))
+      } else {
+        const span = document.createElement('span')
+        span.textContent = t.text
+        span.className = 'literal token'
+        frag.appendChild(span)
+      }
+    }
+  }
+
+  els.renderArea.appendChild(frag)
+  const first = els.renderArea.querySelector('input.word-input')
+  if (first) first.focus()
+  updateStats()
+}
+
 function generate() {
   state.originalText = els.sourceText.value ?? ''
   const ratio = Number(els.maskRatio.value)
-  const { codepoints, maskMap } = buildMask(state.originalText, ratio)
-  state.codepoints = codepoints
-  state.maskMap = maskMap
-  state.totalMasked = maskMap.filter(Boolean).length
-  renderBoard(codepoints, maskMap)
+  const mode = els.maskMode?.value || 'char'
+  if (mode === 'word') {
+    const { tokens, maskMap } = buildMaskWord(state.originalText, ratio)
+    state.codepoints = []
+    state.maskMap = maskMap
+    state.totalMasked = maskMap.filter(Boolean).length
+    renderBoardWord(tokens, maskMap)
+  } else {
+    const { codepoints, maskMap } = buildMaskChar(state.originalText, ratio)
+    state.codepoints = codepoints
+    state.maskMap = maskMap
+    state.totalMasked = maskMap.filter(Boolean).length
+    renderBoardChar(codepoints, maskMap)
+  }
 }
 
 function revealAll() {
-  const inputs = els.renderArea.querySelectorAll('input.mask-input')
-  inputs.forEach((inp) => {
+  const charInputs = els.renderArea.querySelectorAll('input.mask-input')
+  const wordInputs = els.renderArea.querySelectorAll('input.word-input')
+  charInputs.forEach((inp) => {
     inp.value = inp.dataset.answer ?? ''
+    inp.classList.add('correct')
+    inp.classList.remove('incorrect')
+  })
+  wordInputs.forEach((inp) => {
+    const ans = inp.dataset.answer ?? ''
+    inp.value = ans
     inp.classList.add('correct')
     inp.classList.remove('incorrect')
   })
@@ -259,6 +388,9 @@ function init() {
   els.btnGenerate.addEventListener('click', generate)
   els.btnRevealAll.addEventListener('click', revealAll)
   els.btnReset.addEventListener('click', resetAll)
+  els.maskMode?.addEventListener('change', () => {
+    if (state.originalText) generate()
+  })
 
   // Fill with demo text for convenience
   if (!els.sourceText.value) {
