@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>랜덤 텍스트 가리기 연습</title>
+  <link rel="stylesheet" href="./styles.css">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="입력한 텍스트의 일부를 랜덤하게 가리고, 빈칸을 채우며 학습하는 도구">
+</head>
+<body>
+  <main class="container">
+    <h1>랜덤 텍스트 빈칸 채우기</h1>
+
+    <section class="controls">
+      <label for="sourceText" class="label">원본 텍스트</label>
+      <textarea id="sourceText" rows="6" placeholder="여기에 텍스트를 입력하세요. 예: 오늘은 날씨가 맑고, 기분이 아주 좋습니다."></textarea>
+
+      <div class="row">
+        <label for="maskRatio">가릴 비율</label>
+        <input id="maskRatio" type="range" min="0" max="100" step="5" value="30" aria-label="가릴 비율 범위 슬라이더">
+        <output id="maskRatioValue" for="maskRatio">30%</output>
+      </div>
+
+      <div class="row buttons">
+        <button id="btnGenerate" type="button">가리기 생성</button>
+        <button id="btnRevealAll" type="button">정답 전체보기</button>
+        <button id="btnReset" type="button" class="secondary">리셋</button>
+      </div>
+    </section>
+
+    <section class="board">
+      <div id="stats" class="stats" aria-live="polite">정답 0/0</div>
+      <div id="renderArea" class="render" tabindex="-1" aria-label="문제 영역" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- 웹서버에서 실행시 -->
+  <script type="module" src="./main.js"></script>
+  <!-- 로컬에서 실행시 -->
+  <!-- <script defer src="./main.js"></script> -->
+</body>
+</html>
+
